@@ -14,6 +14,8 @@ Reproduction step-by-step of this course "[Python crash course](https://www.yout
     - [Create the first view](#create-the-first-view)
     - [Make HTML templates](#make-html-templates)
     - [Show questions in index](#show-questions-in-index)
+  - [Tutorial expansion](#tutorial-expansion)
+    - [Create a REST API](#create-a-rest-api)
 
 ---
 
@@ -374,3 +376,13 @@ We're then going to define the model for our poll applications. These entities w
             # Return results
             return HttpResponseRedirect(reverse('polls:results', args=(question_id,)))
     ```
+
+---
+
+## Tutorial expansion
+
+This part is not included in the django crash course video, but I included since I found it useful.
+
+### Create a REST API
+
+
