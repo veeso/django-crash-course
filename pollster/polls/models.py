@@ -15,7 +15,7 @@ class Choice(models.Model):
     Choice represents a choice for a certain ``Question``
     """
     # If a question is deleted, all related choices are deleted -> `on_delete = models.CASCADE`
-    question = models.ForeignKey(Question, on_delete=models.CASCADE)
+    question = models.ForeignKey(Question, related_name='choices', on_delete=models.CASCADE)
     choice_text = models.CharField(max_length=256)
     votes = models.IntegerField(default=0)
 

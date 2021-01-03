@@ -123,15 +123,15 @@ We're then going to define the model for our poll applications. These entities w
     ```sh
     python manage.py shell
     >>> q = Question.objects.get(pk = 1)
-    >>> q.choice_set.create(choice_text = "C/C++")
-    >>> q.choice_set.create(choice_text = "JavaScript")
-    >>> q.choice_set.create(choice_text = "Rust")
-    >>> q.choice_set.create(choice_text = "Python")
-    >>> q.choice_set.create(choice_text = "Java")
-    >>> q.choice_set.create(choice_text = "CSharp")
-    >>> q.choice_set.create(choice_text = "Go")
-    >>> q.choice_set.create(choice_text = "PHP")
-    >>> q.choice_set.create(choice_text = "Ruby")
+    >>> q.choices.create(choice_text = "C/C++")
+    >>> q.choices.create(choice_text = "JavaScript")
+    >>> q.choices.create(choice_text = "Rust")
+    >>> q.choices.create(choice_text = "Python")
+    >>> q.choices.create(choice_text = "Java")
+    >>> q.choices.create(choice_text = "CSharp")
+    >>> q.choices.create(choice_text = "Go")
+    >>> q.choices.create(choice_text = "PHP")
+    >>> q.choices.create(choice_text = "Ruby")
     >>> q.save()
     >>> quit()
     ```
@@ -363,7 +363,7 @@ We're then going to define the model for our poll applications. These entities w
         """
         question = get_object_or_404(Question, pk=question_id)
         try:
-            selected_choice = question.choice_set.get(pk=request.POST['choice'])
+            selected_choice = question.choices.get(pk=request.POST['choice'])
         except (KeyError, Choice.DoesNotExist):
             return render(request, 'polls/detail.html', {
                 'question': question,
@@ -385,4 +385,192 @@ This part is not included in the django crash course video, but I included since
 
 ### Create a REST API
 
+Let's create a REST API to interact with the poll application.
+We'll implement the following methods
 
+- GET /polls/api/questions
+
+which will return an object with all questions summary
+
+```json
+[
+    {
+        "id": 1,
+        "text": "What's your favourite programming language?"
+    }
+]
+```
+
+- GET /polls/api/question/{ID}
+
+which will return an object with the question details and choices
+
+```json
+[
+    {
+        "id": 1,
+        "text": "What's your favourite programming language?",
+        "choices": [
+            {
+                "id": 1,
+                "text": "Rust",
+                "votes": 2
+            },
+            {
+                "id": 2,
+                "text": "C/C++",
+                "votes": 1
+            }
+        ]
+    }
+]
+```
+
+- POST /polls/api/vote/{QUESTION_ID}
+
+which will enregister the vote for a certain poll
+
+```json
+{
+    "choice": 2
+}
+```
+
+Let's see the implementation step-by-step.
+
+Setup:
+
+1. Install Django REST Framework
+
+    ```sh
+    pip install djangorestframework
+    ```
+
+2. Tell Django we've installed the REST framework
+
+    Move to `pollster/pollster/settings.py`
+
+    ```py
+    INSTALLED_APPS = [
+    #...
+    'rest_framework',
+    ]
+    ```
+
+Let's create the GET request
+
+1. Add `related_name` to `Choice` in models:
+
+    Move to `pollster/polls/models.py`
+
+    ```py
+    class Choice(models.Model):
+        """
+        Choice represents a choice for a certain ``Question``
+        """
+        # If a question is deleted, all related choices are deleted -> `on_delete = models.CASCADE`
+        question = models.ForeignKey(Question, related_name='choices', on_delete=models.CASCADE)
+        #...
+    ```
+
+2. Create serializers
+
+    move to `pollster/polls/serializers.py`
+
+    ```py
+    # Import serializers from REST framework
+    from rest_framework import serializers
+    # Import our models
+    from .models import Question, Choice
+
+    class QuestionBriefSerializer(serializers.HyperlinkedModelSerializer):
+        class Meta:
+            model = Question
+            fields = ('question_text', 'pub_date')
+
+    class QuestionSerializer(serializers.HyperlinkedModelSerializer):
+        # Add choices to relations and serialize it using the `ChoiceSerializer`
+        choices = ChoiceSerializer(many=True)
+        class Meta:
+            model = Question
+            fields = ('question_text', 'pub_date', 'choices')
+
+    ```
+
+3. Display data in views
+
+    move to `pollster/polls/views.py`
+
+    ```py
+    from rest_framework.response import Response
+    from rest_framework.decorators import api_view
+    from .serializers import QuestionSerializer, QuestionBriefSerializer
+    #...
+    @api_view(['GET'])
+    def questionList(request):
+        questions = Question.objects.all().order_by('pub_date')
+        serializer = QuestionBriefSerializer(questions, many=True) # Many indicates whether we want 1 or more elements
+        return Response(serializer.data)
+    
+    @api_view(['GET'])
+    def questionDetail(request, question_id):
+        question = get_object_or_404(Question, pk=question_id)
+        serializer = QuestionSerializer(question, many=False) # Many indicates whether we want 1 or more elements
+        return Response(serializer.data)
+    
+    ```
+
+4. Add URLs and router
+
+    Move to `pollster/polls/urls.py`
+
+    ```py
+    from django.urls import path
+
+    # Import views
+    from . import views
+    
+    # Give app a name
+    app_name = "polls"
+    urlpatterns = [
+        path('', views.index, name='index'), # /polls/index.html
+        path('<int:question_id>/', views.detail, name='detail'),
+        path('<int:question_id>/results', views.results, name='results'),
+        path('<int:question_id>/vote/', views.vote, name='vote'),
+        path('api/questions/', views.questionList, name='questions'),
+        path('api/question/<int:question_id>/', views.questionDetail, name="question"),
+    ]
+    ```
+
+Now you should finally be able to perform a GET to `http://localhost:8000/polls/api/questions`
+
+Let's implement the vote POST method.
+
+1. Add request to view
+
+    ```py
+    @api_view(['POST'])
+    @parser_classes([JSONParser])
+    def questionVote(request, question_id):
+        question = get_object_or_404(Question, pk=question_id)
+        print(request.data)
+        try:
+            selected_choice = question.choices.get(pk=request.data['choice'])
+        except (KeyError, Choice.DoesNotExist):
+            raise Http404
+        else:
+            # Increase choice counter and save
+            selected_choice.votes += 1
+            selected_choice.save()
+        # Return updated question
+        serializer = QuestionSerializer(question, many=False) # Many indicates whether we want 1 or more elements
+        return Response(serializer.data)
+    ```
+
+2. Add URL
+
+    ```py
+    path('api/vote/<int:question_id>', views.questionVote, name="vote"),
+    ```
+
+And that's all.
