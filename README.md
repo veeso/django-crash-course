@@ -12,6 +12,8 @@ Reproduction step-by-step of this course "[Python crash course](https://www.yout
     - [Enter admin area](#enter-admin-area)
     - [Add to administration a form to add polls](#add-to-administration-a-form-to-add-polls)
     - [Create the first view](#create-the-first-view)
+    - [Make HTML templates](#make-html-templates)
+    - [Show questions in index](#show-questions-in-index)
 
 ---
 
@@ -259,3 +261,116 @@ We're then going to define the model for our poll applications. These entities w
     move to `pollster/pollster/settings.py`
     and to `TEMPLATES`
     add `'DIRS': [os.path.join(BASE_DIR, 'templates')],`
+
+### Make HTML templates
+
+1. Let's make base html template at `pollster/templates/base.html`
+2. Extend base in `pollster/templates/polls/index.html`
+
+    ```html
+    {% extends 'base.html' %}
+    {% block content %}
+      POLLS
+    {% endblock %}
+    ```
+
+### Show questions in index
+
+1. Move to `pollster/polls/views.py`
+
+    ```py
+    def index(request):
+    latest_question_list = Question.objects.order_by('-pub_date')[:5] # Max 5 and sort by pub date
+    context = {'latest_question_list': latest_question_list}
+    return render(request, 'polls/index.html', context=context)
+    ```
+
+2. Add implementation for `index.html`
+
+    ```html
+    {% extends 'base.html' %}
+    {% block content %}
+      <h1 class="text-center mb-3">Poll questions</h1>
+      {% if latest_question_list %}
+        {% for question in latest_question_list %}
+          <div class="card mb-3">
+            <div class="card-body">
+              <h2 class="lead">
+                {{ question.question_text }}
+              </h2>
+              <a href="{% url 'polls:detail' question.id %}" class="btn btn-primary btn-sm">Vote now!</a>
+              <a href="{% url 'polls:results' question.id %}" class="btn btn-secondary btn-sm">View results</a>
+            </div>
+          </div>
+        {% endfor %}
+      {% else %}
+        <h2 class="text-center mb-3">No polls available</h2>
+      {% endif %}
+    {% endblock %}
+    ```
+
+3. Let's implement details
+
+    Move to `pollster/polls/views.py`
+
+    ```py
+    def detail(request, question_id):
+        """
+        Show speicific question and choices
+        """
+        try:
+            # Get question by id
+            question = Question.objects.get(pk=question_id)
+        except Question.DoesNotExist:
+            # Return 404
+            raise Http404
+        context = {'question': question}
+        return render(request, 'polls/detail.html', context=context)
+    ```
+
+4. Let's implement results
+
+    ```py
+    def results(request, question_id: int):
+        """
+        Show results for a question
+        """
+        question = get_object_or_404(Question, pk=question_id)
+        context = {'question': question}
+        return render(request, 'polls/results.html', context=context)
+    ```
+
+5. Add other pages to `pollster/polls/urls.py`
+
+    ```py
+    urlpatterns = [
+        path('', views.index, name='index'), # /polls/index.html
+        path('<int:question_id>', view=views.detail, name='detail'),
+        path('<int:question_id>', view=views.results, name='results'),
+        path('<int:question_id>/vote/', views.vote, name='vote'),
+    ]
+    ```
+
+6. Add results.html and detail.html
+7. Add vote
+
+    ```py
+    def vote(request, question_id: int):
+        """
+        Enregister the user vote
+        """
+        question = get_object_or_404(Question, pk=question_id)
+        try:
+            selected_choice = question.choice_set.get(pk=request.POST['choice'])
+        except (KeyError, Choice.DoesNotExist):
+            return render(request, 'polls/detail.html', {
+                'question': question,
+                'error_message': "You didn't select any choice"
+            })
+        else:
+            # Increase choice counter and save
+            selected_choice.votes += 1
+            selected_choice.save()
+            # Return results
+            return HttpResponseRedirect(reverse('polls:results', args=(question_id,)))
+    ```

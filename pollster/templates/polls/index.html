@@ -1,19 +1,19 @@
-  
-<!DOCTYPE html>
-<html>
-
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="minimum-scale=1, initial-scale=1, width=device-width" />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
-  <title>Polls</title>
-</head>
-
-<body>
-  <div id="root">
-    <h1>Polls</h1>
-  </div>
-</body>
-
-</html>
+{% extends 'base.html' %}
+{% block content %}
+  <h1 class="text-center mb-3">Poll questions</h1>
+  {% if latest_question_list %}
+    {% for question in latest_question_list %}
+      <div class="card mb-3">
+        <div class="card-body">
+          <h2 class="lead">
+            {{ question.question_text }}
+          </h2>
+          <a href="{% url 'polls:detail' question.id %}" class="btn btn-primary btn-sm">Vote now!</a>
+          <a href="{% url 'polls:results' question.id %}" class="btn btn-secondary btn-sm">View results</a>
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <h2 class="text-center mb-3">No polls available</h2>
+  {% endif %}
+{% endblock %}
