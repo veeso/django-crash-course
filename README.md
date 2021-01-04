@@ -57,7 +57,7 @@ Reproduction step-by-step of this course "[Python crash course](https://www.yout
 
 7. Create app (polls)
 
-    `python3 startapp polls`
+    `python3 manage.py startapp polls`
 
 8. Add polls to apps
 
