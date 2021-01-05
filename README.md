@@ -483,6 +483,11 @@ Let's create the GET request
     # Import our models
     from .models import Question, Choice
 
+    class ChoiceSerializer(serializers.ModelSerializer):
+        class Meta:
+            model = Choice
+            fields = ('choice_text', 'votes', 'id')
+
     class QuestionBriefSerializer(serializers.HyperlinkedModelSerializer):
         class Meta:
             model = Question
